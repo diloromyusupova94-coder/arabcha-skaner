@@ -5,20 +5,21 @@ from PIL import Image
 # 1. Sahifa sozlamalari
 st.set_page_config(page_title="Arabcha AI Skaner", page_icon="🌙")
 st.title("🌙 Arabcha Matn Skaneri va Sharhlovchi")
-st.write("Rasm yuklang, matnni aniqlaymiz va sharhlaymiz.")
 
-# 2. API Kalitni kiritish (Xavfsizlik uchun yon paneldan kiritiladi)
-with st.sidebar:
-    st.header("Sozlamalar")
-    api_key = st.text_input("Gemini API Keyni kiriting:", type="password")
-    if api_key:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+# 2. Xavfsiz API kalitni olish (Secrets orqali)
+# Agar secrets'ga qo'shgan bo'lsangiz, u avtomatik ishlaydi
+if "GEMINI_API_KEY" in st.secrets:
+    api_key = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+else:
+    st.error("API kalit topilmadi. Iltimos, Secrets bo'limini tekshiring.")
+    st.stop()
 
 # 3. Fayl yuklash qismi
 uploaded_file = st.file_uploader("Arabcha matnli rasm yuklang...", type=['jpg', 'jpeg', 'png'])
 
-if uploaded_file and api_key:
+if uploaded_file:
     image = Image.open(uploaded_file)
     st.image(image, caption='Yuklangan rasm', use_container_width=True)
     
@@ -30,17 +31,15 @@ if uploaded_file and api_key:
             st.success("Matn aniqlandi!")
             st.text_area("Aniqlangan arabcha matn:", st.session_state['arab_text'], height=200)
 
-    # 4. Tarjima va Sharh
     if 'arab_text' in st.session_state:
-        if st.button("O‘zbekchaga tarjima qilaymi?"):
-            with st.spinner('Tarjima qilinmoqda...'):
-                res = model.generate_content(f"Ushbu matnni o‘zbekchaga tarjima qil: {st.session_state['arab_text']}")
-                st.info(f"Tarjima: \n\n {res.text}")
-                
-                if st.button("Sharhlab beraymi?"):
-                    with st.spinner('Sharhlanmoqda...'):
-                        res_sh = model.generate_content(f"Ushbu matnni grammatik va ma'noviy sharhla: {st.session_state['arab_text']}")
-                        st.warning(f"Sharh: \n\n {res_sh.text}")
-
-elif not api_key and uploaded_file:
-    st.warning("Iltimos, avval chap tarafdagi menyuga API kalitingizni kiriting.")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Tarjima qilish"):
+                with st.spinner('Tarjima...'):
+                    res = model.generate_content(f"Ushbu matnni o‘zbekchaga tarjima qil: {st.session_state['arab_text']}")
+                    st.info(res.text)
+        with col2:
+            if st.button("Sharhlash"):
+                with st.spinner('Sharh...'):
+                    res_sh = model.generate_content(f"Ushbu matnni grammatik tahlil va ma'noviy sharhla: {st.session_state['arab_text']}")
+                    st.warning(res_sh.text)
