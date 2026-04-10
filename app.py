@@ -12,8 +12,8 @@ if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
     try:
         genai.configure(api_key=api_key)
-        # Model nomini to'liq yo'l bilan ko'rsatamiz (xatolikni oldini olish uchun)
-        model = genai.GenerativeModel('models/gemini-1.5-flash')
+        # Model nomini eng barqaror variantga o'zgartirdik
+        model = genai.GenerativeModel('gemini-1.5-flash')
     except Exception as e:
         st.error(f"API konfiguratsiyada xato: {e}")
         st.stop()
@@ -31,19 +31,20 @@ if uploaded_file:
     if st.button("Skanerlash"):
         with st.spinner('AI matnni o‘qimoqda...'):
             try:
-                # AI uchun aniq vazifa (prompt)
+                # AI uchun aniq vazifa
                 prompt = "Ushbu rasmdagi arabcha matnni aniq, harakatlari (i'rob) bilan tering. Faqat arabcha matnni o'zini qaytaring."
                 response = model.generate_content([prompt, image])
                 
                 # Natijani saqlash
                 st.session_state['arab_text'] = response.text
                 st.success("Matn muvaffaqiyatli aniqlandi!")
-                st.text_area("Aniqlangan arabcha matn:", st.session_state['arab_text'], height=200)
             except Exception as e:
                 st.error(f"Skanerlashda xatolik yuz berdi: {e}")
 
-    # 4. Tarjima va Sharh bo'limi
+    # Natija chiqarish
     if 'arab_text' in st.session_state:
+        st.text_area("Aniqlangan arabcha matn:", st.session_state['arab_text'], height=200)
+        
         st.divider()
         col1, col2 = st.columns(2)
         
