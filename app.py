@@ -7,17 +7,17 @@ st.set_page_config(page_title="Arabcha AI Skaner", page_icon="🌙")
 st.title("🌙 Arabcha Matn Skaneri va Sharhlovchi")
 st.write("Rasm yuklang, matnni aniqlaymiz va sharhlaymiz.")
 
-# 2. API konfiguratsiyasi
+# 2. API va Modelni sozlash
 if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
-    # Eng sodda va universal model nomi
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # Modelni faqat SHU YERDA, bir marta aniqlaymiz
+    model = genai.GenerativeModel('gemini-1.5-flash-latest')
 else:
     st.error("API kalit topilmadi. Secrets bo'limini tekshiring.")
     st.stop()
 
-# 3. Fayl yuklash
+# 3. Fayl yuklash qismi
 uploaded_file = st.file_uploader("Arabcha matnli rasm yuklang...", type=['jpg', 'jpeg', 'png'])
 
 if uploaded_file:
@@ -27,8 +27,8 @@ if uploaded_file:
     if st.button("Skanerlash"):
         with st.spinner('AI matnni o‘qimoqda...'):
             try:
-                # Promptni soddalashtirdik
-                prompt = "Read the Arabic text in this image and provide it with tashkeel."
+                # Rasmdan matnni ajratib olish vazifasi
+                prompt = "Rasmdagi arabcha matnni i'rob (harakatlari) bilan birma-bir ko'chirib yozing."
                 response = model.generate_content([prompt, image])
                 
                 if response.text:
@@ -37,25 +37,23 @@ if uploaded_file:
                 else:
                     st.error("AI matnni aniqlay olmadi.")
             except Exception as e:
-                # Agar yana 404 bersa, muqobil modelni sinab ko'radi
-                try:
-                    alt_model = genai.GenerativeModel('gemini-pro-vision')
-                    response = alt_model.generate_content([prompt, image])
-                    st.session_state['arab_text'] = response.text
-                    st.success("Matn muqobil model orqali aniqlandi!")
-                except Exception as e2:
-                    st.error(f"Xatolik: {e2}")
+                st.error(f"Xatolik yuz berdi: {e}")
 
-    # Natijalarni ko'rsatish
+    # 4. Natijani ko'rsatish va Tahlil
     if 'arab_text' in st.session_state:
         st.text_area("Aniqlangan arabcha matn:", st.session_state['arab_text'], height=200)
         
+        st.divider()
         col1, col2 = st.columns(2)
+        
         with col1:
-            if st.button("O‘zbekchaga tarjima"):
-                res = model.generate_content(f"Tarjima qil: {st.session_state['arab_text']}")
-                st.info(res.text)
+            if st.button("O‘zbekchaga tarjima qilish"):
+                with st.spinner('Tarjima qilinmoqda...'):
+                    t_res = model.generate_content(f"Ushbu matnni o'zbek tiliga tarjima qiling: {st.session_state['arab_text']}")
+                    st.info(f"**Tarjima:**\n\n{t_res.text}")
+        
         with col2:
-            if st.button("Grammatik sharh"):
-                res_sh = model.generate_content(f"Ushbu matnni nahviy tahlil qil: {st.session_state['arab_text']}")
-                st.warning(res_sh.text)
+            if st.button("Grammatik sharhlash"):
+                with st.spinner('Tahlil qilinmoqda...'):
+                    s_res = model.generate_content(f"Ushbu matnni nahv va sarf bo'yicha tahlil qiling: {st.session_state['arab_text']}")
+                    st.warning(f"**Sharh:**\n\n{s_res.text}")
