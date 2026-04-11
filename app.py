@@ -23,14 +23,15 @@ if uploaded_file:
     st.image(image, use_container_width=True)
     
     if st.button("Skanerlashni boshlash"):
-        with st.spinner('AI to'g'ridan-to'g'ri ulanmoqda...'):
+        # Tutuq belgilari olib tashlangan xavfsiz matn
+        with st.spinner("AI ulanmoqda, iltimos kuting..."):
             try:
                 # Rasmni kodga aylantirish
                 buffered = io.BytesIO()
                 image.save(buffered, format="JPEG")
                 img_str = base64.b64encode(buffered.getvalue()).decode()
 
-                # Google API'ga to'g'ridan-to'g'ri so'rov (v1 barqaror versiya)
+                # Google API'ga to'g'ridan-to'g'ri so'rov
                 url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
                 
                 payload = {
@@ -52,6 +53,6 @@ if uploaded_file:
                     st.write(text_output)
                 else:
                     st.error(f"Xato kodi: {response.status_code}")
-                    st.json(result) # Xatoni aniq ko'rish uchun
+                    st.json(result)
             except Exception as e:
-                st.error(f"Kutilmagan xato: {e}")
+                st.error(f"Xato yuz berdi: {e}")
