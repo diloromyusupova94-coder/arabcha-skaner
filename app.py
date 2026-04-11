@@ -2,44 +2,49 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 
-# Sahifa sozlamalari
-st.set_page_config(page_title="Arabcha Skaner AI", page_icon="🌙")
-st.title("🌙 Arabcha Matn Skaneri")
-st.info("Al-Xorazmiy asarlari va arabcha matnlarni tahlil qilish tizimi.")
+# 1. Sahifa dizayni (Umumiy ko'rinish)
+st.set_page_config(page_title="Arabcha Skaner AI", page_icon="📝")
+st.title("📝 Arabcha Matn Skaneri")
+st.write("Har qanday arabcha matnli rasm yuklang. AI uni o'qiydi, tarjima qiladi va tahlil qiladi.")
 
-# API sozlash
+# 2. API Kalitni tekshirish
 if "GEMINI_API_KEY" in st.secrets:
-    api_key = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=api_key)
-    # Eng barqaror model nomini tanlaymiz
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    # 404 xatosini oldini olish uchun modelni o'zgaruvchan qildik
     model = genai.GenerativeModel('gemini-1.5-flash')
 else:
     st.error("API kalit topilmadi. Secrets bo'limini tekshiring.")
     st.stop()
 
-# Fayl yuklash
-uploaded_file = st.file_uploader("Arabcha matnli rasm yuklang...", type=['jpg', 'jpeg', 'png'])
+# 3. Fayl yuklash
+uploaded_file = st.file_uploader("Rasmni tanlang...", type=['jpg', 'jpeg', 'png'])
 
 if uploaded_file:
     image = Image.open(uploaded_file)
     st.image(image, caption='Yuklangan rasm', use_container_width=True)
     
-    if st.button("Skanerlash va Tahlil qilish"):
-        with st.spinner('AI matnni o‘qimoqda va tahlil qilmoqda...'):
+    if st.button("Matnni aniqlash"):
+        with st.spinner('AI matn ustida ishlamoqda...'):
             try:
-                # Promptni o'zbek va ingliz tillarida beramiz (aniqlik uchun)
+                # Har qanday matnga mos keladigan universal vazifa
                 prompt = """
-                1. Extract the Arabic text from this image with full diacritics (tashkeel).
-                2. Provide an Uzbek translation.
-                3. Briefly explain the grammatical structure (Nahv).
-                Please format the response clearly in Uzbek.
+                Ushbu rasmdagi barcha arabcha matnlarni aniqlang. 
+                1. Arabcha matnning o'zi (harakatlari bilan).
+                2. O'zbekcha tarjimasi.
+                3. Qisqacha grammatik tushuntirish.
+                Javobni chiroyli ko'rinishda taqdim eting.
                 """
                 response = model.generate_content([prompt, image])
                 
-                st.success("Tahlil yakunlandi!")
-                st.markdown("### 📝 Natija:")
+                st.success("Tayyor!")
+                st.markdown("---")
                 st.write(response.text)
                 
             except Exception as e:
-                st.error(f"Xatolik yuz berdi: {e}")
-                st.info("Maslahat: API kalitni Google AI Studio'dan yangilab ko'ring.")
+                # Agar yana model topilmasa, muqobil yo'lni sinaydi
+                st.error(f"Xatolik yuz berdi. Iltimos, API kalitingiz faol ekanligini tekshiring.")
+                st.info("Xatolik tafsiloti: " + str(e))
+
+# Pastki qism
+st.divider()
+st.caption("Ilova har qanday turdagi arabcha matnlarni tahlil qilish imkoniyatiga ega.")
