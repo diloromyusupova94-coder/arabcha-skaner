@@ -5,9 +5,9 @@ from PIL import Image
 # 1. Sahifa dizayni
 st.set_page_config(page_title="Arabcha Skaner AI", page_icon="📝")
 st.title("📝 Arabcha Matn Skaneri")
-st.write("Har qanday arabcha rasm yuklang, AI uni tahlil qiladi.")
+st.write("Har qanday rasm yuklang, AI uning ustida tahlil o'tkazadi.")
 
-# 2. API Kalitni tekshirish va sozlash
+# 2. API Kalitni sozlash
 if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
@@ -24,35 +24,28 @@ if uploaded_file:
     
     if st.button("Matnni aniqlash"):
         with st.spinner('AI ulanmoqda...'):
-            # BARCHA MUMKIN BO'LGAN MODEL NOMLARINI KETMA-KET SINAYMIZ
-            possible_models = [
-                'gemini-1.5-flash', 
-                'models/gemini-1.5-flash', 
-                'gemini-pro-vision', 
-                'models/gemini-pro-vision'
-            ]
-            
-            response = None
-            error_message = ""
-            
-            for m_name in possible_models:
-                try:
-                    model = genai.GenerativeModel(m_name)
-                    prompt = "Ushbu rasmdagi arabcha matnni o'qing, o'zbekchaga tarjima qiling va grammatik tahlil qiling."
+            try:
+                # ISHLAYDIGAN MODELNI AVTOMATIK ANIQLASH (404 xatosiga barham beradi)
+                # Tizimda mavjud bo'lgan birinchi ishlaydigan modelni oladi
+                model_list = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                
+                if not model_list:
+                    st.error("Sizning kalitingiz uchun birorta ham model topilmadi.")
+                else:
+                    # Ro'yxatdagi eng yaxshisini tanlash
+                    chosen_model_name = model_list[0] 
+                    model = genai.GenerativeModel(chosen_model_name)
+                    
+                    prompt = "Ushbu rasmdagi arabcha matnni o'qing, i'robini ko'rsating, o'zbekchaga tarjima qiling va grammatik tahlil qiling."
                     response = model.generate_content([prompt, image])
-                    if response:
-                        break # Agar ishlasa, to'xtaydi
-                except Exception as e:
-                    error_message = str(e)
-                    continue # Ishlamasa, keyingisiga o'tadi
-            
-            if response:
-                st.success("Muvaffaqiyatli aniqlandi!")
-                st.markdown("---")
-                st.write(response.text)
-            else:
-                st.error("Xatolik yuz berdi. API kalitingiz ushbu modellarni qo'llab-quvvatlamayapti.")
-                st.info(f"Tizim xabari: {error_message}")
+                    
+                    st.success(f"Aniqlangan model: {chosen_model_name}")
+                    st.markdown("---")
+                    st.write(response.text)
+                    
+            except Exception as e:
+                st.error("Ulanishda xatolik yuz berdi.")
+                st.info(f"Tafsilot: {e}")
 
 st.divider()
-st.caption("Ilova filologik tahlillar uchun mo'ljallangan.")
+st.caption("Ilova filologik va matniy tadqiqotlar uchun mo'ljallangan.")
