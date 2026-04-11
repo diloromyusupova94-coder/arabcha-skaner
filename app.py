@@ -9,7 +9,6 @@ import base64
 st.set_page_config(page_title="Arabcha Skaner Pro", page_icon="📖")
 st.title("📖 Arabcha Matn Tahlilchisi")
 
-# API Kalitni olish
 api_key = os.getenv("GEMINI_API_KEY")
 
 if not api_key:
@@ -23,36 +22,39 @@ if uploaded_file:
     st.image(image, use_container_width=True)
     
     if st.button("Skanerlashni boshlash"):
-        # Tutuq belgilari olib tashlangan xavfsiz matn
-        with st.spinner("AI ulanmoqda, iltimos kuting..."):
-            try:
-                # Rasmni kodga aylantirish
-                buffered = io.BytesIO()
-                image.save(buffered, format="JPEG")
-                img_str = base64.b64encode(buffered.getvalue()).decode()
+        with st.spinner("AI ulanmoqda..."):
+            # Modellarni navbat bilan sinash ro'yxati
+            models_to_try = ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-pro-vision"]
+            success = False
 
-                # Google API'ga to'g'ridan-to'g'ri so'rov
-                url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
-                
-                payload = {
-                    "contents": [{
-                        "parts": [
-                            {"text": "Ushbu rasmdagi arabcha matnni o'qing va o'zbekchaga tarjima qiling."},
-                            {"inline_data": {"mime_type": "image/jpeg", "data": img_str}}
-                        ]
-                    }]
-                }
-                
-                headers = {'Content-Type': 'application/json'}
-                response = requests.post(url, headers=headers, data=json.dumps(payload))
-                result = response.json()
+            for model_name in models_to_try:
+                try:
+                    buffered = io.BytesIO()
+                    image.save(buffered, format="JPEG")
+                    img_str = base64.b64encode(buffered.getvalue()).decode()
 
-                if response.status_code == 200:
-                    text_output = result['candidates'][0]['content']['parts'][0]['text']
-                    st.success("Tahlil yakunlandi!")
-                    st.write(text_output)
-                else:
-                    st.error(f"Xato kodi: {response.status_code}")
-                    st.json(result)
-            except Exception as e:
-                st.error(f"Xato yuz berdi: {e}")
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+                    
+                    payload = {
+                        "contents": [{
+                            "parts": [
+                                {"text": "Ushbu rasmdagi arabcha matnni o'qing va o'zbekchaga tarjima qiling."},
+                                {"inline_data": {"mime_type": "image/jpeg", "data": img_str}}
+                            ]
+                        }]
+                    }
+                    
+                    response = requests.post(url, headers={'Content-Type': 'application/json'}, data=json.dumps(payload))
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        text_output = result['candidates'][0]['content']['parts'][0]['text']
+                        st.success(f"Tahlil yakunlandi! (Model: {model_name})")
+                        st.write(text_output)
+                        success = True
+                        break # Agar ishlasa, keyingi modellarni sinab o'tirmaymiz
+                except:
+                    continue
+            
+            if not success:
+                st.error("Hozircha Google modellari sizning kalitingizga ruxsat bermayapti. Iltimos, 10 daqiqa kutib qayta urining.")
