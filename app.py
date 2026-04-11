@@ -2,18 +2,17 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 
-# 1. Ilova ko'rinishi
+# 1. Sahifa dizayni
 st.set_page_config(page_title="Arabcha Skaner AI", page_icon="📝")
 st.title("📝 Arabcha Matn Skaneri")
-st.write("Istalgan arabcha matnli rasm yuklang.")
+st.write("Har qanday arabcha rasm yuklang, AI uni tahlil qiladi.")
 
-# 2. API Kalitni ulash
+# 2. API Kalitni tekshirish va sozlash
 if "GEMINI_API_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    # DIQQAT: 404 xatosini yopish uchun model nomini o'zgartirdik
-    model = genai.GenerativeModel('gemini-1.5-flash-latest')
+    api_key = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=api_key)
 else:
-    st.error("API kalit topilmadi. Secrets bo'limini tekshiring.")
+    st.error("API kalit topilmadi! Secrets bo'limini tekshiring.")
     st.stop()
 
 # 3. Fayl yuklash
@@ -24,20 +23,36 @@ if uploaded_file:
     st.image(image, caption='Yuklangan rasm', use_container_width=True)
     
     if st.button("Matnni aniqlash"):
-        with st.spinner('AI ishlamoqda...'):
-            try:
-                # Vazifani inglizcha beramiz (AI inglizchada yaxshiroq tushunadi)
-                prompt = "Please read the Arabic text in this image, provide it with vowels (tashkeel), translate it into Uzbek, and explain the grammar briefly."
-                response = model.generate_content([prompt, image])
-                
-                st.success("Bajarildi!")
+        with st.spinner('AI ulanmoqda...'):
+            # BARCHA MUMKIN BO'LGAN MODEL NOMLARINI KETMA-KET SINAYMIZ
+            possible_models = [
+                'gemini-1.5-flash', 
+                'models/gemini-1.5-flash', 
+                'gemini-pro-vision', 
+                'models/gemini-pro-vision'
+            ]
+            
+            response = None
+            error_message = ""
+            
+            for m_name in possible_models:
+                try:
+                    model = genai.GenerativeModel(m_name)
+                    prompt = "Ushbu rasmdagi arabcha matnni o'qing, o'zbekchaga tarjima qiling va grammatik tahlil qiling."
+                    response = model.generate_content([prompt, image])
+                    if response:
+                        break # Agar ishlasa, to'xtaydi
+                except Exception as e:
+                    error_message = str(e)
+                    continue # Ishlamasa, keyingisiga o'tadi
+            
+            if response:
+                st.success("Muvaffaqiyatli aniqlandi!")
                 st.markdown("---")
                 st.write(response.text)
-                
-            except Exception as e:
-                # Agar yana 404 bersa, eng oxirgi chora: model nomini o'zgartirish
-                st.error("Ulanishda xatolik. API kalitingiz Google AI Studio'da 'Pay-as-you-go' emas, 'Free' ekanini tekshiring.")
-                st.info(f"Tizim xabari: {e}")
+            else:
+                st.error("Xatolik yuz berdi. API kalitingiz ushbu modellarni qo'llab-quvvatlamayapti.")
+                st.info(f"Tizim xabari: {error_message}")
 
 st.divider()
-st.caption("Ilova barcha turdagi arabcha matnlarni (gazeta, kitob, qo'lyozma) tahlil qila oladi.")
+st.caption("Ilova filologik tahlillar uchun mo'ljallangan.")
