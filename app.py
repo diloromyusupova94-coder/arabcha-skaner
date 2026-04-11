@@ -1,56 +1,73 @@
 import streamlit as st
-from google import genai
-from google.genai import types
 from PIL import Image
 import io
+import base64
+import requests
+import os
 import time
 
-# Sahifa sozlamalari
 st.set_page_config(page_title="Arabcha Matn Skaneri", page_icon="📖")
 st.title("📖 Arabcha Matn Skaneri va Tarjimon")
 st.caption("Rasm yuklang → Matnni skanerlaydi → O'zbekchaga tarjima qiladi")
 
-# API sozlash
-if "GEMINI_API_KEY" not in st.secrets:
-    st.error("❌ API kalit topilmadi! Streamlit Secrets ga GEMINI_API_KEY qo'shing.")
-    st.code('[secrets]\nGEMINI_API_KEY = "AIza..."', language="toml")
+api_key = None
+try:
+    api_key = st.secrets["GEMINI_API_KEY"]
+except:
+    api_key = os.environ.get("GEMINI_API_KEY")
+
+if not api_key:
+    st.error("❌ API kalit topilmadi!")
     st.stop()
 
-client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+def call_gemini(prompt, image_base64, max_retries=3):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    
+    payload = {
+        "contents": [{
+            "parts": [
+                {"text": prompt},
+                {
+                    "inline_data": {
+                        "mime_type": "image/jpeg",
+                        "data": image_base64
+                    }
+                }
+            ]
+        }],
+        "generationConfig": {
+            "temperature": 0.1,
+            "maxOutputTokens": 4096
+        }
+    }
+    
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(url, json=payload, timeout=60)
+            
+            if response.status_code == 200:
+                data = response.json()
+                return data["candidates"][0]["content"]["parts"][0]["text"], None
+            
+            elif response.status_code == 429:
+                if attempt < max_retries - 1:
+                    wait = 30 * (attempt + 1)
+                    st.warning(f"⏳ Limit to'ldi, {wait}s kutilmoqda...")
+                    time.sleep(wait)
+                    continue
+                return None, "quota"
+            
+            else:
+                return None, f"HTTP {response.status_code}: {response.text}"
+                
+        except Exception as e:
+            return None, str(e)
+    
+    return None, "Xato"
 
-# Session state
 if "result" not in st.session_state:
     st.session_state.result = None
 
-# Retry funksiyasi
-def generate_with_retry(prompt, image, max_retries=3):
-    for attempt in range(max_retries):
-        try:
-            response = client.models.generate_content(
-                model="gemini-1.5-flash",
-                contents=[prompt, image],
-                config=types.GenerateContentConfig(
-                    temperature=0.1,
-                    max_output_tokens=4096,
-                )
-            )
-            return response.text, None
-
-        except Exception as e:
-            error_str = str(e)
-            if "429" in error_str or "ResourceExhausted" in error_str or "Quota" in error_str:
-                wait_time = 30 * (attempt + 1)
-                if attempt < max_retries - 1:
-                    st.warning(f"⏳ API limiti to'ldi. {wait_time} soniya kutilmoqda... ({attempt+1}/{max_retries})")
-                    time.sleep(wait_time)
-                    continue
-                else:
-                    return None, "quota"
-            return None, error_str
-
-    return None, "Maksimal urinishlar soni tugadi."
-
-# Fayl yuklash
 uploaded_file = st.file_uploader(
     "📷 Arabcha matnli rasm yuklang",
     type=['jpg', 'jpeg', 'png', 'webp'],
@@ -58,20 +75,19 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file is not None:
     uploaded_file.seek(0)
-    file_bytes = uploaded_file.read()
-
-    image = Image.open(io.BytesIO(file_bytes))
+    image = Image.open(io.BytesIO(uploaded_file.read()))
     if image.mode != 'RGB':
         image = image.convert('RGB')
 
     st.image(image, caption="Yuklangan rasm", use_container_width=True)
-    st.success(f"✅ Rasm yuklandi: {uploaded_file.name}")
+    st.success(f"✅ {uploaded_file.name}")
 
-    target_lang = st.selectbox(
-        "🌐 Tarjima tili:",
-        ["O'zbek tili", "Rus tili", "Ingliz tili"]
-    )
+    # Rasmni base64 ga o'tkazish
+    buf = io.BytesIO()
+    image.save(buf, format='JPEG', quality=90)
+    img_b64 = base64.b64encode(buf.getvalue()).decode()
 
+    target_lang = st.selectbox("🌐 Tarjima tili:", ["O'zbek tili", "Rus tili", "Ingliz tili"])
     do_analysis = st.checkbox("🔍 Grammatika tahlili", value=True)
 
     if st.button("🚀 Skanerlash va Tahlil", type="primary", use_container_width=True):
@@ -79,11 +95,9 @@ if uploaded_file is not None:
 
         prompt = f"""Siz arabcha matn mutaxassisiysiz. Quyidagi vazifalarni bajaring:
 
-1. **ARABCHA MATN (OCR)**: Rasmdagi BARCHA arabcha matnni aynan ko'chirib yozing. Agar arabcha matn yo'q bo'lsa, shuni ayting.
-
+1. **ARABCHA MATN (OCR)**: Rasmdagi BARCHA arabcha matnni aynan ko'chirib yozing.
 2. **{target_lang.upper()}GA TARJIMA**: Matnni to'liq {target_lang}ga tarjima qiling.
-
-{"3. **GRAMMATIKA TAHLILI**: Asosiy grammatik tuzilmalar va qiziqarli iboralar haqida qisqacha izohlang." if do_analysis else ""}
+{"3. **GRAMMATIKA TAHLILI**: Asosiy grammatik tuzilmalar haqida qisqacha izohlang." if do_analysis else ""}
 
 Javob formati:
 ---
@@ -95,15 +109,13 @@ Javob formati:
 
 {"📚 GRAMMATIKA TAHLILI:" + chr(10) + "[tahlil]" if do_analysis else ""}
 """
-
-        with st.spinner("⏳ Gemini tahlil qilmoqda..."):
-            result, error = generate_with_retry(prompt, image)
+        with st.spinner("⏳ Tahlil qilmoqda..."):
+            result, error = call_gemini(prompt, img_b64)
 
         if result:
             st.session_state.result = result
         elif error == "quota":
-            st.error("❌ API limiti to'ldi. Bir oz kuting va qayta urining.")
-            st.markdown("💡 Yangi API kalit: [Google AI Studio](https://aistudio.google.com/apikey)")
+            st.error("❌ API limiti to'ldi. Biroz kuting.")
         else:
             st.error(f"❌ Xato: {error}")
 
@@ -111,15 +123,8 @@ Javob formati:
         st.markdown("---")
         st.markdown("### 📋 Natija:")
         st.markdown(st.session_state.result)
-
-        st.download_button(
-            label="💾 Natijani saqlash (.txt)",
-            data=st.session_state.result,
-            file_name="arabcha_tarjima.txt",
-            mime="text/plain",
-            use_container_width=True
-        )
-
+        st.download_button("💾 Saqlash (.txt)", st.session_state.result,
+                           "natija.txt", "text/plain", use_container_width=True)
 else:
-    st.info("👆 Yuqoridagi tugmani bosib arabcha matnli rasm yuklang")
+    st.info("👆 Rasm yuklang")
     st.session_state.result = None
