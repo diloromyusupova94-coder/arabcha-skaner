@@ -19,8 +19,8 @@ genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
 @st.cache_resource
 def load_model():
-    # gemini-1.5-flash-latest — bepul rejimda eng ko'p limitga ega
-    return genai.GenerativeModel('gemini-1.5-flash-latest')
+    # v1beta bilan ishlaydigan to'g'ri model nomi
+    return genai.GenerativeModel('gemini-1.5-flash')
 
 model = load_model()
 
@@ -44,9 +44,8 @@ def generate_with_retry(prompt, image, max_retries=3):
         except Exception as e:
             error_str = str(e)
 
-            # Quota xatosi
             if "429" in error_str or "ResourceExhausted" in error_str or "Quota" in error_str:
-                wait_time = 30 * (attempt + 1)  # 30s, 60s, 90s
+                wait_time = 30 * (attempt + 1)
                 if attempt < max_retries - 1:
                     st.warning(f"⏳ API limiti to'ldi. {wait_time} soniya kutilmoqda... ({attempt+1}/{max_retries})")
                     time.sleep(wait_time)
@@ -54,7 +53,6 @@ def generate_with_retry(prompt, image, max_retries=3):
                 else:
                     return None, "quota"
 
-            # Boshqa xatolar
             return None, error_str
 
     return None, "Maksimal urinishlar soni tugadi."
@@ -112,13 +110,11 @@ Javob formati:
         if result:
             st.session_state.result = result
         elif error == "quota":
-            st.error("❌ API kunlik limiti to'ldi.")
-            st.warning("💡 **Yechimlar:**")
+            st.error("❌ API limiti to'ldi. Bir oz kuting va qayta urining.")
             st.markdown("""
-- **Bir oz kuting** (1-2 daqiqa) va qayta urining
-- **Bepul limit:** minutiga 15 so'rov, kuniga 1500 so'rov
-- **Yangi API kalit oling:** [Google AI Studio](https://aistudio.google.com/apikey)
-- **Pullik rejimga o'ting:** [Google Cloud Console](https://console.cloud.google.com)
+**💡 Yechimlar:**
+- 1-2 daqiqa kuting va qayta bosing
+- Yangi API kalit oling: [Google AI Studio](https://aistudio.google.com/apikey)
 """)
         else:
             st.error(f"❌ Xato: {error}")
