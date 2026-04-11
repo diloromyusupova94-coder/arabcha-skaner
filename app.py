@@ -5,7 +5,7 @@ import io
 
 # Sahifa sozlamalari
 st.set_page_config(page_title="Arabcha Matn Skaneri", page_icon="📖")
-st.title("📖 Arabcha matn skaneri va tarjimon")
+st.title("📖 Arabcha Matn Skaneri va Tarjimon")
 st.caption("Rasm yuklang → Matnni skanerlaydi → O'zbekchaga tarjima qiladi")
 
 # API sozlash
@@ -55,26 +55,18 @@ if uploaded_file is not None:
         ["O'zbek tili", "Rus tili", "Ingliz tili"]
     )
 
-    col1, col2 = st.columns(2)
-    with col1:
-        do_analysis = st.checkbox("🔍 Grammatika tahlili", value=True)
+    do_analysis = st.checkbox("🔍 Grammatika tahlili", value=True)
 
     # Tugma
     if st.button("🚀 Skanerlash va Tahlil", type="primary", use_container_width=True):
-        st.session_state.result = None  # oldingi natijani tozalash
+        st.session_state.result = None
 
         # Rasmni JPEG bytes ga o'tkazish
         img_buffer = io.BytesIO()
         image.save(img_buffer, format='JPEG', quality=95)
         img_bytes = img_buffer.getvalue()
 
-        # Gemini Part obyekti
-        from google.generativeai import types as gtypes
-        image_part = gtypes.Part.from_bytes(
-            data=img_bytes,
-            mime_type="image/jpeg"
-        )
-
+        # To'g'ri image format — PIL Image to'g'ridan uzatish
         prompt = f"""Siz arabcha matn mutaxassisiysiz. Quyidagi vazifalarni bajaring:
 
 1. **ARABCHA MATN (OCR)**: Rasmdagi BARCHA arabcha matnni aynan ko'chirib yozing. Agar arabcha matn yo'q bo'lsa, shuni ayting.
@@ -96,8 +88,9 @@ Javob formati:
 
         with st.spinner("⏳ Gemini tahlil qilmoqda..."):
             try:
+                # PIL Image ni to'g'ridan Gemini ga uzatish (eng ishonchli usul)
                 response = model.generate_content(
-                    [prompt, image_part],
+                    [prompt, image],
                     generation_config=genai.types.GenerationConfig(
                         temperature=0.1,
                         max_output_tokens=4096,
@@ -125,6 +118,5 @@ Javob formati:
         )
 
 else:
-    # Rasm yuklanmagan holat
     st.info("👆 Yuqoridagi tugmani bosib arabcha matnli rasm yuklang")
     st.session_state.result = None
