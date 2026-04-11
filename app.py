@@ -1,5 +1,6 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from PIL import Image
 import io
 import time
@@ -15,35 +16,7 @@ if "GEMINI_API_KEY" not in st.secrets:
     st.code('[secrets]\nGEMINI_API_KEY = "AIza..."', language="toml")
     st.stop()
 
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-
-# Model — mavjud modellardan birinchisini ishlatadi
-@st.cache_resource
-def load_model():
-    # Qaysi model mavjud bo'lsa, o'shani ishlatadi
-    model_names = [
-        "gemini-1.5-flash",
-        "gemini-1.0-pro-vision",
-        "gemini-pro-vision",
-    ]
-    try:
-        available = [m.name for m in genai.list_models()
-                     if 'generateContent' in m.supported_generation_methods]
-    except Exception:
-        available = []
-
-    for name in model_names:
-        full_name = f"models/{name}"
-        if not available or full_name in available or name in available:
-            try:
-                return genai.GenerativeModel(name), name
-            except Exception:
-                continue
-
-    # Oxirgi fallback
-    return genai.GenerativeModel("gemini-1.5-flash"), "gemini-1.5-flash"
-
-model, model_name = load_model()
+client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
 # Session state
 if "result" not in st.session_state:
@@ -53,9 +26,10 @@ if "result" not in st.session_state:
 def generate_with_retry(prompt, image, max_retries=3):
     for attempt in range(max_retries):
         try:
-            response = model.generate_content(
-                [prompt, image],
-                generation_config=genai.types.GenerationConfig(
+            response = client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents=[prompt, image],
+                config=types.GenerateContentConfig(
                     temperature=0.1,
                     max_output_tokens=4096,
                 )
@@ -64,7 +38,6 @@ def generate_with_retry(prompt, image, max_retries=3):
 
         except Exception as e:
             error_str = str(e)
-
             if "429" in error_str or "ResourceExhausted" in error_str or "Quota" in error_str:
                 wait_time = 30 * (attempt + 1)
                 if attempt < max_retries - 1:
@@ -73,7 +46,6 @@ def generate_with_retry(prompt, image, max_retries=3):
                     continue
                 else:
                     return None, "quota"
-
             return None, error_str
 
     return None, "Maksimal urinishlar soni tugadi."
@@ -82,7 +54,6 @@ def generate_with_retry(prompt, image, max_retries=3):
 uploaded_file = st.file_uploader(
     "📷 Arabcha matnli rasm yuklang",
     type=['jpg', 'jpeg', 'png', 'webp'],
-    help="Kitob, hujjat, yozuv rasmlari qo'llaniladi"
 )
 
 if uploaded_file is not None:
@@ -125,7 +96,7 @@ Javob formati:
 {"📚 GRAMMATIKA TAHLILI:" + chr(10) + "[tahlil]" if do_analysis else ""}
 """
 
-        with st.spinner(f"⏳ {model_name} tahlil qilmoqda..."):
+        with st.spinner("⏳ Gemini tahlil qilmoqda..."):
             result, error = generate_with_retry(prompt, image)
 
         if result:
