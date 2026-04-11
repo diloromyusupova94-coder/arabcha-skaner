@@ -17,12 +17,33 @@ if "GEMINI_API_KEY" not in st.secrets:
 
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
+# Model — mavjud modellardan birinchisini ishlatadi
 @st.cache_resource
 def load_model():
-    # v1beta bilan ishlaydigan to'g'ri model nomi
-    return genai.GenerativeModel('gemini-1.5-flash')
+    # Qaysi model mavjud bo'lsa, o'shani ishlatadi
+    model_names = [
+        "gemini-1.5-flash",
+        "gemini-1.0-pro-vision",
+        "gemini-pro-vision",
+    ]
+    try:
+        available = [m.name for m in genai.list_models()
+                     if 'generateContent' in m.supported_generation_methods]
+    except Exception:
+        available = []
 
-model = load_model()
+    for name in model_names:
+        full_name = f"models/{name}"
+        if not available or full_name in available or name in available:
+            try:
+                return genai.GenerativeModel(name), name
+            except Exception:
+                continue
+
+    # Oxirgi fallback
+    return genai.GenerativeModel("gemini-1.5-flash"), "gemini-1.5-flash"
+
+model, model_name = load_model()
 
 # Session state
 if "result" not in st.session_state:
@@ -104,18 +125,14 @@ Javob formati:
 {"📚 GRAMMATIKA TAHLILI:" + chr(10) + "[tahlil]" if do_analysis else ""}
 """
 
-        with st.spinner("⏳ Gemini tahlil qilmoqda..."):
+        with st.spinner(f"⏳ {model_name} tahlil qilmoqda..."):
             result, error = generate_with_retry(prompt, image)
 
         if result:
             st.session_state.result = result
         elif error == "quota":
             st.error("❌ API limiti to'ldi. Bir oz kuting va qayta urining.")
-            st.markdown("""
-**💡 Yechimlar:**
-- 1-2 daqiqa kuting va qayta bosing
-- Yangi API kalit oling: [Google AI Studio](https://aistudio.google.com/apikey)
-""")
+            st.markdown("💡 Yangi API kalit: [Google AI Studio](https://aistudio.google.com/apikey)")
         else:
             st.error(f"❌ Xato: {error}")
 
