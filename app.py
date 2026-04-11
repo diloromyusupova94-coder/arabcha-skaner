@@ -3,31 +3,40 @@ import google.generativeai as genai
 from PIL import Image
 import os
 
+# 1. Sahifa dizayni
 st.set_page_config(page_title="Arabcha Skaner", page_icon="📝")
 st.title("📝 Arabcha Matn Skaneri")
 
-# Railway'da Environment Variables qismiga GEMINI_API_KEY deb qo'shasiz
+# 2. API Kalitni Railway'dan olish
 api_key = os.getenv("GEMINI_API_KEY")
 
 if api_key:
+    # v1beta xatosini yo'qotish uchun majburiy sozlama
     genai.configure(api_key=api_key)
+    # Eng barqaror modelni tanlaymiz
     model = genai.GenerativeModel('gemini-1.5-flash')
 else:
-    st.error("API kalit topilmadi. Railway sozlamalarini tekshiring.")
+    st.error("Railway Variables bo'limida API kalit topilmadi!")
+    st.info("Railway panelida 'Variables' bo'limiga kiring va GEMINI_API_KEY qo'shing.")
     st.stop()
 
-uploaded_file = st.file_uploader("Rasm yuklang...", type=['jpg', 'jpeg', 'png'])
+# 3. Fayl yuklash
+uploaded_file = st.file_uploader("Rasmni yuklang (JPG, PNG)", type=['jpg', 'jpeg', 'png'])
 
 if uploaded_file:
     image = Image.open(uploaded_file)
-    st.image(image, use_container_width=True)
+    st.image(image, caption='Yuklangan rasm', use_container_width=True)
     
-    if st.button("Skanerlash"):
-        with st.spinner('AI ishlamoqda...'):
+    if st.button("Skanerlashni boshlash"):
+        with st.spinner('AI ulanmoqda va tahlil qilyapti...'):
             try:
-                prompt = "Ushbu rasmdagi arabcha matnni o'qing, o'zbekchaga tarjima qiling va grammatik tahlil qiling."
+                # Rasmni AIga tushunarli formatga o'tkazamiz
+                prompt = "Ushbu rasmdagi arabcha matnni aniqlang, o'zbekchaga tarjima qiling va qisqacha grammatik tahlil bering."
                 response = model.generate_content([prompt, image])
-                st.success("Tayyor!")
+                
+                st.success("Tahlil tayyor!")
+                st.markdown("---")
                 st.write(response.text)
             except Exception as e:
-                st.error(f"Xatolik: {e}")
+                st.error("Xatolik yuz berdi.")
+                st.info(f"Tizim xabari: {e}")
