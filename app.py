@@ -3,31 +3,46 @@ import google.generativeai as genai
 import os
 from PIL import Image
 
-st.set_page_config(page_title="Arabcha Skaner")
+# 1. Sahifa sozlamalari (Dizayn uchun)
+st.set_page_config(page_title="Arabcha Skaner Pro", page_icon="📝")
 st.title("📝 Arabcha Matn Tahlilchisi")
+st.markdown("---")
 
+# 2. API Kalitni Railway'dan olish
 api_key = os.getenv("GEMINI_API_KEY")
 
 if api_key:
-    # Bu safar faqat v1 barqaror versiyani sinaymiz
+    # Google AI sozlamasi
     genai.configure(api_key=api_key)
+    # Eng barqaror model
     model = genai.GenerativeModel('gemini-1.5-flash')
 else:
-    st.error("API kalit topilmadi!")
+    st.error("Diqqat! API kalit topilmadi. Railway Variables bo'limini tekshiring.")
     st.stop()
 
-uploaded_file = st.file_uploader("Rasmni yuklang", type=['jpg', 'jpeg', 'png'])
+# 3. Fayl yuklash qismi
+uploaded_file = st.file_uploader("Arabcha matnli rasmni yuklang", type=['jpg', 'jpeg', 'png'])
 
 if uploaded_file:
+    # Rasmni ochish va ko'rsatish
     image = Image.open(uploaded_file)
-    st.image(image, use_container_width=True)
+    st.image(image, caption='Yuklangan rasm', use_container_width=True)
     
-    if st.button("Skanerlash"):
-        with st.spinner('Tahlil qilinmoqda...'):
+    # Tugma bosilganda AI ishga tushadi
+    if st.button("Skanerlash va Tahlil qilish"):
+        with st.spinner('AI matnni o‘qimoqda, kuting...'):
             try:
-                # Rasmni yuborishning eng sodda usuli
-                response = model.generate_content(["Ushbu arabcha matnni o'qing va tahlil qiling", image])
-                st.success("Bajarildi!")
+                # AIga yuboriladigan buyruq (Prompt)
+                vazifa = "Rasmdagi arabcha matnni aniq ko'chirib yozing, o'zbek tiliga tarjima qiling va qisqacha grammatik tahlil bering."
+                
+                # Natijani olish
+                response = model.generate_content([vazifa, image])
+                
+                # Natijani ekranga chiqarish
+                st.success("Tahlil yakunlandi!")
+                st.markdown("### Natija:")
                 st.write(response.text)
+                
             except Exception as e:
-                st.error(f"Google xatosi: {e}")
+                st.error("Kutilmagan xatolik yuz berdi.")
+                st.info(f"Xato xabari: {e}")
